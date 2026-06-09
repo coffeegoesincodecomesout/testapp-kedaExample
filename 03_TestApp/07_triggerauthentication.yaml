@@ -1,0 +1,19 @@
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: thanos-token
+  namespace: testapp-keda
+stringData:
+  token: ""
+---
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: keda-trigger-auth-prometheus
+  namespace: testapp-keda
+spec:
+  secretTargetRef:
+  - parameter: bearerToken
+    name: thanos-token
+    key: token
