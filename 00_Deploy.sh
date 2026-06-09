@@ -149,7 +149,7 @@ ROUTE_URL=$(oc get route testapp -n testapp-keda -o jsonpath='{.spec.host}')
 log "============================================"
 log "KEDA Deployment Complete!"
 log "============================================"
-log "Application URL: http://$ROUTE_URL"
+log "Application URL: http://$ROUTE_URL/ping"
 log ""
 log "To test autoscaling:"
 log "  1. Generate load: while true; do curl http://$ROUTE_URL/ping; sleep 0.1; done"
