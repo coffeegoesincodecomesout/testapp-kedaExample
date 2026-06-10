@@ -52,12 +52,11 @@ This repository demonstrates Kubernetes Event-Driven Autoscaling (KEDA) on OpenS
 
 ### 3. Test Application (`03_TestApp/`)
 - Namespace: `testapp-keda`
-- Container: `quay.io/coffeegoesincodecomesout/testapp-threepilar:latest`
+- Container: `quay.io/rhn_support_nigsmith/testapp-threepilars:latest`
+- Port: `8090`
 - Endpoints:
-  - `/ping` - Generates requests (increments ping_request_count)
+  - `/ping` - Main endpoint that increments ping_request_count metric (includes 1s sleep and OpenTelemetry tracing)
   - `/metrics` - Prometheus metrics endpoint
-  - `/health` - Liveness probe
-  - `/ready` - Readiness probe
 
 ### 4. KEDA ScaledObject
 - **Metric**: `ping_request_count` (rate over 1 minute)
