@@ -57,6 +57,7 @@ This repository demonstrates Kubernetes Event-Driven Autoscaling (KEDA) on OpenS
 - Endpoints:
   - `/ping` - Main endpoint that increments ping_request_count metric (includes 1s sleep and OpenTelemetry tracing)
   - `/metrics` - Prometheus metrics endpoint
+- **RBAC**: Minimal permissions using ClusterRole for Thanos Querier access (see Security section below)
 
 ### 4. KEDA ScaledObject
 - **Metric**: `ping_request_count` (rate over 1 minute)
@@ -130,6 +131,51 @@ oc exec -n openshift-user-workload-monitoring prometheus-user-workload-0 -- \
 2. **Load generation**: When `ping_request_count` rate exceeds 5 requests/second
 3. **Scale up**: KEDA creates additional pods (up to 5 total)
 4. **Scale down**: After 5 minutes of low load, pods scale back down to 1
+
+## Security - RBAC Configuration
+
+This deployment uses **least-privilege RBAC** for KEDA to access OpenShift monitoring metrics. Instead of using the overly permissive `cluster-monitoring-view` ClusterRole, we create a minimal ClusterRole with only the required permissions:
+
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: thanos-metrics-reader
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - namespaces
+  verbs:
+  - get
+- apiGroups:
+  - monitoring.coreos.com
+  resourceNames:
+  - k8s
+  resources:
+  - prometheuses/api
+  verbs:
+  - get
+  - create
+```
+
+### Key Components:
+- **ServiceAccount**: `keda-prometheus-reader` (in `testapp-keda` namespace)
+- **ClusterRole**: `thanos-metrics-reader` (minimal permissions for Thanos Querier API access)
+- **ClusterRoleBinding**: Links the ServiceAccount to the ClusterRole
+- **TriggerAuthentication**: Uses service account token stored in a Secret for bearer authentication
+
+### Why Not cluster-monitoring-view?
+The `cluster-monitoring-view` ClusterRole grants broad permissions across the entire cluster monitoring stack. Our custom ClusterRole grants only:
+1. Permission to get namespace metadata
+2. Access to the Prometheus/Thanos API endpoint (`prometheuses/api` in `monitoring.coreos.com`)
+
+This follows the principle of least privilege.
+
+### Documentation Bug Alert
+⚠️ **Red Hat's documentation (as of OCP 4.20) contains a bug**: It suggests using a namespace-scoped `Role` with `metrics.k8s.io` permissions, which **will not work** for accessing Thanos Querier in OpenShift. The correct approach requires:
+- A **ClusterRole** (not a Role) because Thanos Querier is in the `openshift-monitoring` namespace
+- Permissions for `monitoring.coreos.com/prometheuses/api` (not `metrics.k8s.io`)
 
 ## Monitoring
 
@@ -218,9 +264,17 @@ oc delete configmap cluster-monitoring-config -n openshift-monitoring
 │   ├── 04_route.yaml                     # OpenShift route
 │   ├── 05_servicemonitor.yaml            # Prometheus ServiceMonitor
 │   ├── 06_scaledobject.yaml              # KEDA ScaledObject
-│   └── 07_triggerauthentication.yaml     # Prometheus auth for KEDA
+│   ├── 07_triggerauthentication.yaml     # Prometheus auth for KEDA (Secret + TriggerAuthentication)
+│   ├── 08_serviceaccount.yaml            # ServiceAccount for KEDA Prometheus access
+│   ├── 09_role.yaml                      # ClusterRole with minimal Thanos permissions
+│   └── 10_rolebinding.yaml               # ClusterRoleBinding for ServiceAccount
 └── README.md
 ```
+
+## Notes
+
+### boundServiceAccountToken vs Secret-based Authentication
+The Red Hat documentation suggests using `boundServiceAccountToken` in the TriggerAuthentication spec. However, this feature may not be supported in all KEDA versions. This example uses the more widely compatible approach of creating a service account token and storing it in a Secret, which works reliably across KEDA versions.
 
 ## References
 
@@ -228,3 +282,4 @@ oc delete configmap cluster-monitoring-config -n openshift-monitoring
 - [OpenShift Monitoring](https://docs.openshift.com/container-platform/latest/monitoring/monitoring-overview.html)
 - [KEDA Prometheus Scaler](https://keda.sh/docs/latest/scalers/prometheus/)
 - [OpenShift User Workload Monitoring](https://docs.openshift.com/container-platform/latest/monitoring/enabling-monitoring-for-user-defined-projects.html)
+- [OpenShift Custom Metrics Autoscaler](https://docs.redhat.com/en/documentation/openshift_container_platform/4.20/html/nodes/automatically-scaling-pods-with-the-custom-metrics-autoscaler-operator)
