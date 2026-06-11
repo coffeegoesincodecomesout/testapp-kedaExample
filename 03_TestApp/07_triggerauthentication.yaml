@@ -4,8 +4,9 @@ kind: Secret
 metadata:
   name: thanos-token
   namespace: testapp-keda
-stringData:
-  token: ""
+  annotations:
+    kubernetes.io/service-account.name: keda-prometheus-reader
+type: kubernetes.io/service-account-token
 ---
 apiVersion: keda.sh/v1alpha1
 kind: TriggerAuthentication

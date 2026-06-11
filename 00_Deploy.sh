@@ -131,13 +131,12 @@ oc apply -f 03_TestApp/08_serviceaccount.yaml
 oc apply -f 03_TestApp/09_role.yaml
 oc apply -f 03_TestApp/10_rolebinding.yaml
 
-# Create TriggerAuthentication and Secret
+# Create TriggerAuthentication and Secret (token auto-populated by service account controller)
 oc apply -f 03_TestApp/07_triggerauthentication.yaml
 
-# Generate and inject service account token
-log "Generating service account token..."
-TOKEN=$(oc create token keda-prometheus-reader -n testapp-keda --duration=87600h)
-oc patch secret thanos-token -n testapp-keda -p "{\"stringData\":{\"token\":\"$TOKEN\"}}"
+# Wait for token to be automatically populated in secret
+log "Waiting for service account token to be auto-populated..."
+sleep 5
 
 # Apply ScaledObject
 oc apply -f 03_TestApp/06_scaledobject.yaml
