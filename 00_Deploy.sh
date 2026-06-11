@@ -124,17 +124,19 @@ wait_for_pods "testapp-keda" "app=testapp" 180
 
 # Phase 4: Configure KEDA Scaling
 log "Phase 4: Configuring KEDA Scaling"
-log "Creating service account token for Prometheus authentication..."
+log "Creating service account and RBAC for Prometheus authentication..."
 
-# Create service account and get token
-oc create sa keda-prometheus-reader -n testapp-keda || true
-oc adm policy add-cluster-role-to-user cluster-monitoring-view system:serviceaccount:testapp-keda:keda-prometheus-reader
+# Create service account with minimal permissions
+oc apply -f 03_TestApp/08_serviceaccount.yaml
+oc apply -f 03_TestApp/09_role.yaml
+oc apply -f 03_TestApp/10_rolebinding.yaml
 
-# Get the token (OpenShift 4.11+ method)
-TOKEN=$(oc create token keda-prometheus-reader -n testapp-keda --duration=87600h)
-
-# Update the secret with the token
+# Create TriggerAuthentication and Secret
 oc apply -f 03_TestApp/07_triggerauthentication.yaml
+
+# Generate and inject service account token
+log "Generating service account token..."
+TOKEN=$(oc create token keda-prometheus-reader -n testapp-keda --duration=87600h)
 oc patch secret thanos-token -n testapp-keda -p "{\"stringData\":{\"token\":\"$TOKEN\"}}"
 
 # Apply ScaledObject
